@@ -4,55 +4,12 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/mfrw/deps/pkg/graph"
-	"github.com/mfrw/deps/pkg/node"
+	"github.com/mfrw/deps/pkg/dsu"
 )
 
 var (
-	input = flag.String("i", "./graph.dot", "Input Dot Graph file")
+	input = flag.String("i", "/home/mfrw/mariner-org/parity/build/pkg_artifacts/graph.dot", "Input Dot Graph file")
 )
-
-type NodeGraph struct {
-	g  *graph.Graph
-	nm map[int]*node.Node
-}
-
-func NewNodeGraph() *NodeGraph {
-	return &NodeGraph{
-		g:  graph.NewGraph(),
-		nm: make(map[int]*node.Node),
-	}
-}
-
-func NewNodeGraphFromDotGraphFile(fname string) (*NodeGraph, error) {
-	edges, err := node.GetOnlyEdges(fname)
-
-	if err != nil {
-		return nil, err
-	}
-
-	graph := NewNodeGraph()
-
-	for _, edge := range edges {
-		from, to, err := node.ProcessLineToNode(edge)
-		if err != nil {
-			return nil, err
-		}
-		graph.AddEdge(from, to)
-	}
-	return graph, nil
-}
-
-func (ng *NodeGraph) AddNode(n *node.Node) {
-	ng.g.AddNode(n.Id)
-	ng.nm[n.Id] = n
-}
-
-func (ng *NodeGraph) AddEdge(from, to *node.Node) {
-	ng.g.AddEdge(from.Id, to.Id)
-	ng.nm[from.Id] = from
-	ng.nm[to.Id] = to
-}
 
 func main() {
 	flag.Parse()
@@ -61,4 +18,24 @@ func main() {
 	ng, _ := NewNodeGraphFromDotGraphFile(graphInput)
 
 	fmt.Println("NR Items in graph:", len(ng.nm))
+	fmt.Println("NR Connected cmps:", DistinctComponents(ng))
+	fmt.Println("NR Node Types:", NodeTypes(ng))
+	fmt.Println("Cycle Found:", ng.FindCycle())
+}
+
+func DistinctComponents(ng *NodeGraph) int {
+	d := dsu.NewDSU(ng.Len())
+	for edge := range ng.GetAllEdgesChan() {
+		d.Unite(edge.From, edge.To)
+	}
+	return d.Components()
+}
+
+func NodeTypes(ng *NodeGraph) map[string]int {
+	mp := map[string]int{}
+
+	for _, v := range ng.nm {
+		mp[v.Type]++
+	}
+	return mp
 }
